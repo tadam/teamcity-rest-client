@@ -136,6 +136,7 @@ private class BuildLocatorImpl(private val instance: TeamCityInstanceImpl) : Bui
     private var branch: String? = null
     private var includeAllBranches = false
     private var pinnedOnly = false
+    private var runningOnly = false
 
     override fun fromConfiguration(buildConfigurationId: BuildConfigurationId): BuildLocatorImpl {
         this.buildConfigurationId = buildConfigurationId
@@ -199,6 +200,7 @@ private class BuildLocatorImpl(private val instance: TeamCityInstanceImpl) : Bui
                     tags.joinToString(",", prefix = "tags:(", postfix = ")")
                 else null,
                 if (pinnedOnly) "pinned:true" else null,
+                if (runningOnly) "running:true" else null,
                 count?.let { "count:$it" },
 
                 sinceDate?.let { "sinceDate:${teamCityServiceDateFormat.get().format(sinceDate)}" },
@@ -220,6 +222,11 @@ private class BuildLocatorImpl(private val instance: TeamCityInstanceImpl) : Bui
 
     override fun pinnedOnly(): BuildLocator {
         this.pinnedOnly = true
+        return this
+    }
+
+    override fun runningOnly(): BuildLocator {
+        this.runningOnly = true
         return this
     }
 }

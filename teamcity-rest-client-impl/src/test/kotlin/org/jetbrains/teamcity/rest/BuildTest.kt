@@ -63,6 +63,19 @@ class BuildTest {
     }
 
     @Test
+    fun test_running_only() = runBlocking<Unit> {
+        val builds = publicInstance().builds()
+                .fromConfiguration(compileExamplesConfiguration)
+                .runningOnly()
+                .limitResults(3)
+                .list()
+
+        for (build in builds) {
+            assertEquals(build.fetchStatusText(), "running")
+        }
+    }
+
+    @Test
     fun test_get_artifacts() = runBlocking<Unit> {
         val build = publicInstance().builds()
                 .fromConfiguration(kotlinDevCompilerAllPlugins)
