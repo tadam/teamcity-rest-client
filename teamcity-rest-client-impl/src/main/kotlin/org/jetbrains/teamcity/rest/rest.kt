@@ -1,80 +1,82 @@
 package org.jetbrains.teamcity.rest
 
 import com.google.gson.annotations.SerializedName
-import retrofit.client.Response
-import retrofit.http.*
-import retrofit.mime.TypedString
+import okhttp3.RequestBody
+import okhttp3.ResponseBody
+import retrofit2.Call
+import retrofit2.http.*
+
 import java.util.*
 
 internal interface TeamCityService {
     @Headers("Accept: application/json")
-    @GET("/app/rest/builds")
-    fun builds(@Query("locator") buildLocator: String): BuildListBean
+    @GET("app/rest/builds")
+    fun builds(@Query("locator") buildLocator: String): Call<BuildListBean>
 
     @Headers("Accept: application/json")
-    @GET("/app/rest/buildQueue")
-    fun queuedBuilds(@Query("locator") locator: String?): QueuedBuildListBean
+    @GET("app/rest/buildQueue")
+    fun queuedBuilds(@Query("locator") locator: String?): Call<QueuedBuildListBean>
 
     @Headers("Accept: application/json")
-    @GET("/app/rest/builds/id:{id}")
-    fun build(@Path("id") id: String): BuildBean
+    @GET("app/rest/builds/id:{id}")
+    fun build(@Path("id") id: String): Call<BuildBean>
 
     @Headers("Accept: application/json")
-    @GET("/app/rest/changes")
-    fun changes(@Query("locator") locator: String, @Query("fields") fields: String): ChangesBean
+    @GET("app/rest/changes")
+    fun changes(@Query("locator") locator: String, @Query("fields") fields: String): Call<ChangesBean>
 
     @Headers("Accept: application/json")
-    @GET("/app/rest/vcs-roots")
-    fun vcsRoots(): VcsRootListBean
+    @GET("app/rest/vcs-roots")
+    fun vcsRoots(): Call<VcsRootListBean>
 
     @Headers("Accept: application/json")
-    @GET("/app/rest/vcs-roots/id:{id}")
-    fun vcsRoot(@Path("id") id: String): VcsRootBean
+    @GET("app/rest/vcs-roots/id:{id}")
+    fun vcsRoot(@Path("id") id: String): Call<VcsRootBean>
 
-    @POST("/app/rest/builds/id:{id}/tags/")
-    fun addTag(@Path("id") buildId: String, @Body tag: TypedString): Response
+    @POST("app/rest/builds/id:{id}/tags/")
+    fun addTag(@Path("id") buildId: String, @Body tag: RequestBody): Call<ResponseBody>
 
-    @PUT("/app/rest/builds/id:{id}/pin/")
-    fun pin(@Path("id") buildId: String, @Body comment: TypedString): Response
+    @PUT("app/rest/builds/id:{id}/pin/")
+    fun pin(@Path("id") buildId: String, @Body comment: RequestBody): Call<ResponseBody>
 
     //The standard DELETE annotation doesn't allow to include a body, so we need to use our own.
     //Probably it would be better to change Rest API here (https://youtrack.jetbrains.com/issue/TW-49178).
-    @DELETE_WITH_BODY("/app/rest/builds/id:{id}/pin/")
-    fun unpin(@Path("id") buildId: String, @Body comment: TypedString): Response
+    @DELETE_WITH_BODY("app/rest/builds/id:{id}/pin/")
+    fun unpin(@Path("id") buildId: String, @Body comment: RequestBody): Call<ResponseBody>
 
     @Streaming
-    @GET("/app/rest/builds/id:{id}/artifacts/content/{path}")
-    fun artifactContent(@Path("id") buildId: String, @Path("path", encode = false) artifactPath: String): Response
+    @GET("app/rest/builds/id:{id}/artifacts/content/{path}")
+    fun artifactContent(@Path("id") buildId: String, @Path("path", encoded = false) artifactPath: String): Call<ResponseBody>
 
     @Headers("Accept: application/json")
-    @GET("/app/rest/builds/id:{id}/artifacts/children/{path}")
-    fun artifactChildren(@Path("id") buildId: String, @Path("path", encode = false) artifactPath: String): ArtifactFileListBean
+    @GET("app/rest/builds/id:{id}/artifacts/children/{path}")
+    fun artifactChildren(@Path("id") buildId: String, @Path("path", encoded = false) artifactPath: String): Call<ArtifactFileListBean>
 
     @Headers("Accept: application/json")
-    @GET("/app/rest/projects/id:{id}")
-    fun project(@Path("id") id: String): ProjectBean
+    @GET("app/rest/projects/id:{id}")
+    fun project(@Path("id") id: String): Call<ProjectBean>
 
     @Headers("Accept: application/json")
-    @GET("/app/rest/buildTypes/id:{id}")
-    fun buildConfiguration(@Path("id") buildTypeId: String): BuildTypeBean
+    @GET("app/rest/buildTypes/id:{id}")
+    fun buildConfiguration(@Path("id") buildTypeId: String): Call<BuildTypeBean>
 
     @Headers("Accept: application/json")
-    @GET("/app/rest/buildTypes/id:{id}/buildTags")
-    fun buildTypeTags(@Path("id") buildTypeId: String): TagsBean
+    @GET("app/rest/buildTypes/id:{id}/buildTags")
+    fun buildTypeTags(@Path("id") buildTypeId: String): Call<TagsBean>
 
     @Headers("Accept: application/json")
-    @GET("/app/rest/buildTypes/id:{id}/triggers")
-    fun buildTypeTriggers(@Path("id") buildTypeId: String): TriggersBean
+    @GET("app/rest/buildTypes/id:{id}/triggers")
+    fun buildTypeTriggers(@Path("id") buildTypeId: String): Call<TriggersBean>
 
     @Headers("Accept: application/json")
-    @GET("/app/rest/buildTypes/id:{id}/artifact-dependencies")
-    fun buildTypeArtifactDependencies(@Path("id") buildTypeId: String): ArtifactDependenciesBean
+    @GET("app/rest/buildTypes/id:{id}/artifact-dependencies")
+    fun buildTypeArtifactDependencies(@Path("id") buildTypeId: String): Call<ArtifactDependenciesBean>
 
-    @PUT("/app/rest/projects/id:{id}/parameters/{name}")
-    fun setProjectParameter(@Path("id") projectId: String, @Path("name") name: String, @Body value: TypedString): Response
+    @PUT("app/rest/projects/id:{id}/parameters/{name}")
+    fun setProjectParameter(@Path("id") projectId: String, @Path("name") name: String, @Body value: RequestBody): Call<ResponseBody>
 
-    @PUT("/app/rest/buildTypes/id:{id}/parameters/{name}")
-    fun setBuildTypeParameter(@Path("id") buildTypeId: String, @Path("name") name: String, @Body value: TypedString): Response
+    @PUT("app/rest/buildTypes/id:{id}/parameters/{name}")
+    fun setBuildTypeParameter(@Path("id") buildTypeId: String, @Path("name") name: String, @Body value: RequestBody): Call<ResponseBody>
 }
 
 internal class ProjectsBean {

@@ -1,6 +1,6 @@
 package org.jetbrains.teamcity.rest;
 
-import retrofit.http.RestMethod;
+import retrofit2.http.HTTP;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
@@ -15,7 +15,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Target(METHOD)
 @Retention(RUNTIME)
-@RestMethod(value = "DELETE", hasBody = true)
 public @interface DELETE_WITH_BODY {
+  @HTTP(method = "DELETE", hasBody = true)
   String value();
 }

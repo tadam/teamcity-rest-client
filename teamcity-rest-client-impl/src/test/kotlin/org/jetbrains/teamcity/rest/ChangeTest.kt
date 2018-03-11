@@ -3,6 +3,8 @@ package org.jetbrains.teamcity.rest
 import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlinx.coroutines.experimental.runBlocking
+
 
 class ChangeTest {
     @Before
@@ -11,7 +13,7 @@ class ChangeTest {
     }
 
     @Test
-    fun webUrl() {
+    fun webUrl() = runBlocking<Unit> {
         val configuration = publicInstance().buildConfiguration(compilerAndPluginConfiguration)
         val change = publicInstance().builds()
                 .fromConfiguration(configuration.id)

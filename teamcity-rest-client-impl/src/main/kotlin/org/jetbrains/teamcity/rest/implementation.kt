@@ -1,13 +1,14 @@
 package org.jetbrains.teamcity.rest
 
-import com.jakewharton.retrofit.Ok3Client
-import okhttp3.Interceptor
-import okhttp3.OkHttpClient
-import okhttp3.Response
+import kotlinx.coroutines.experimental.runBlocking
+import okhttp3.*
+import okhttp3.logging.HttpLoggingInterceptor
+import okhttp3.logging.HttpLoggingInterceptor.Level
 import org.apache.commons.codec.binary.Base64
 import org.slf4j.LoggerFactory
-import retrofit.RestAdapter
-import retrofit.mime.TypedString
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import ru.gildor.coroutines.retrofit.await
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -55,71 +56,74 @@ internal class TeamCityInstanceImpl(internal val serverUrl: String,
                                     logResponses: Boolean) : TeamCityInstance() {
     override fun withLogResponses() = TeamCityInstanceImpl(serverUrl, authMethod, basicAuthHeader, true)
 
-    private val RestLOG = LoggerFactory.getLogger(LOG.name + ".rest")
+    private val logging = HttpLoggingInterceptor().setLevel(if (logResponses) Level.BODY else Level.HEADERS)
 
     private var client = OkHttpClient.Builder()
-            .addInterceptor(RetryInterceptor())
-            .build()
-
-    internal val service = RestAdapter.Builder()
-            .setClient(Ok3Client(client))
-            .setEndpoint("$serverUrl/$authMethod")
-            .setLog({ RestLOG.debug(it) })
-            .setLogLevel(if (logResponses) retrofit.RestAdapter.LogLevel.FULL else retrofit.RestAdapter.LogLevel.HEADERS_AND_ARGS)
-            .setRequestInterceptor({ request ->
+            .addInterceptor({ chain ->
                 if (basicAuthHeader != null) {
-                    request.addHeader("Authorization", "Basic $basicAuthHeader")
+                    val newRequest = chain.request().newBuilder()
+                            .addHeader("Authorization", "Basic $basicAuthHeader")
+                            .build()
+                    chain.proceed(newRequest)
+                } else {
+                    chain.proceed(chain.request())
                 }
             })
-            .setErrorHandler({ throw Error("Failed to connect to ${it.url}: ${it.message}", it) })
+            .addInterceptor(RetryInterceptor())
+            .addInterceptor(logging)
+            .build()
+
+    internal val service = Retrofit.Builder()
+            .client(client)
+            .baseUrl("$serverUrl/$authMethod/")
+            .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(TeamCityService::class.java)
 
     override fun builds(): BuildLocator = BuildLocatorImpl(this)
 
-    override fun queuedBuilds(projectId: ProjectId?): List<QueuedBuild> {
+    override suspend fun queuedBuilds(projectId: ProjectId?): List<QueuedBuild> {
         val locator = if (projectId == null) null else "project:${projectId.stringId}"
-        return service.queuedBuilds(locator).build.map { QueuedBuildImpl(it, this) }
+        return service.queuedBuilds(locator).await().build.map { QueuedBuildImpl(it, this) }
     }
 
-    override fun build(id: BuildId): Build = BuildImpl(service.build(id.stringId), true, this)
+    override suspend fun build(id: BuildId): Build = BuildImpl(service.build(id.stringId).await(), true, this)
 
-    override fun build(buildType: BuildConfigurationId, number: String): Build?
-            = BuildLocatorImpl(this).fromConfiguration(buildType).withNumber(number).latest()
+    override suspend fun build(buildType: BuildConfigurationId, number: String): Build? = BuildLocatorImpl(this).fromConfiguration(buildType).withNumber(number).latest()
 
-    override fun buildConfiguration(id: BuildConfigurationId):
-            BuildConfiguration = BuildConfigurationImpl(service.buildConfiguration(id.stringId), this)
+    override suspend fun buildConfiguration(id: BuildConfigurationId):
+            BuildConfiguration = BuildConfigurationImpl(service.buildConfiguration(id.stringId).await(), this)
 
     override fun vcsRoots(): VcsRootLocator = VcsRootLocatorImpl(service)
 
-    override fun vcsRoot(id: VcsRootId): VcsRoot = VcsRootImpl(service.vcsRoot(id.stringId))
+    override suspend fun vcsRoot(id: VcsRootId): VcsRoot = VcsRootImpl(service.vcsRoot(id.stringId).await())
 
-    override fun project(id: ProjectId): Project = ProjectImpl(service.project(id.stringId), true, this)
+    override suspend fun project(id: ProjectId): Project = ProjectImpl(service.project(id.stringId).await(), true, this)
 
-    override fun rootProject(): Project = project(ProjectId("_Root"))
+    override suspend fun rootProject(): Project = project(ProjectId("_Root"))
 
     override fun getWebUrl(projectId: ProjectId, branch: String?): String =
-        getUserUrlPage(serverUrl, "project.html", projectId = projectId, branch = branch)
+            getUserUrlPage(serverUrl, "project.html", projectId = projectId, branch = branch)
 
     override fun getWebUrl(buildConfigurationId: BuildConfigurationId, branch: String?): String =
-        getUserUrlPage(serverUrl, "viewType.html", buildTypeId = buildConfigurationId, branch = branch)
+            getUserUrlPage(serverUrl, "viewType.html", buildTypeId = buildConfigurationId, branch = branch)
 
     override fun getWebUrl(buildId: BuildId): String =
-        getUserUrlPage(
-                serverUrl, "viewLog.html",
-                buildId = buildId,
-                tab = "buildResultsDiv"
-        )
+            getUserUrlPage(
+                    serverUrl, "viewLog.html",
+                    buildId = buildId,
+                    tab = "buildResultsDiv"
+            )
 
     override fun getWebUrl(queuedBuildId: QueuedBuildId): String =
-        getUserUrlPage(serverUrl, "viewQueued.html", itemId = queuedBuildId)
+            getUserUrlPage(serverUrl, "viewQueued.html", itemId = queuedBuildId)
 
     override fun getWebUrl(changeId: ChangeId, specificBuildConfigurationId: BuildConfigurationId?, includePersonalBuilds: Boolean?): String =
-        getUserUrlPage(
-                serverUrl, "viewModification.html",
-                modId = changeId,
-                buildTypeId = specificBuildConfigurationId,
-                personal = includePersonalBuilds)
+            getUserUrlPage(
+                    serverUrl, "viewModification.html",
+                    modId = changeId,
+                    buildTypeId = specificBuildConfigurationId,
+                    personal = includePersonalBuilds)
 }
 
 private class BuildLocatorImpl(private val instance: TeamCityInstanceImpl) : BuildLocator {
@@ -182,11 +186,11 @@ private class BuildLocatorImpl(private val instance: TeamCityInstanceImpl) : Bui
         return this
     }
 
-    override fun latest(): Build? {
+    override suspend fun latest(): Build? {
         return limitResults(1).list().firstOrNull()
     }
 
-    override fun list(): List<Build> {
+    override suspend fun list(): List<Build> {
         val parameters = listOf(
                 buildConfigurationId?.stringId?.let { "buildType:$it" },
                 number?.let { "number:$it" },
@@ -197,7 +201,7 @@ private class BuildLocatorImpl(private val instance: TeamCityInstanceImpl) : Bui
                 if (pinnedOnly) "pinned:true" else null,
                 count?.let { "count:$it" },
 
-                sinceDate?.let {"sinceDate:${teamCityServiceDateFormat.get().format(sinceDate)}"},
+                sinceDate?.let { "sinceDate:${teamCityServiceDateFormat.get().format(sinceDate)}" },
 
                 if (!includeAllBranches)
                     branch?.let { "branch:$it" }
@@ -211,7 +215,7 @@ private class BuildLocatorImpl(private val instance: TeamCityInstanceImpl) : Bui
 
         val buildLocator = parameters.joinToString(",")
         LOG.debug("Retrieving builds from ${instance.serverUrl} using query '$buildLocator'")
-        return instance.service.builds(buildLocator).build.map { BuildImpl(it, false, instance) }
+        return instance.service.builds(buildLocator).await().build.map { BuildImpl(it, false, instance) }
     }
 
     override fun pinnedOnly(): BuildLocator {
@@ -240,16 +244,22 @@ private class ProjectImpl(
         get() = ProjectId(bean.parentProjectId!!)
 
     val fullProjectBean: ProjectBean by lazy {
-        if (isFullProjectBean) bean else instance.service.project(id.stringId)
+        if (isFullProjectBean) {
+            bean
+        } else {
+            runBlocking {
+                instance.service.project(id.stringId).await()
+            }
+        }
     }
 
     override fun fetchChildProjects(): List<Project> = fullProjectBean.projects!!.project.map { ProjectImpl(it, false, instance) }
     override fun fetchBuildConfigurations(): List<BuildConfiguration> = fullProjectBean.buildTypes!!.buildType.map { BuildConfigurationImpl(it, instance) }
     override fun fetchParameters(): List<Parameter> = fullProjectBean.parameters!!.property!!.map { ParameterImpl(it) }
 
-    override fun setParameter(name: String, value: String) {
+    override suspend fun setParameter(name: String, value: String) {
         LOG.info("Setting parameter $name=$value in ${bean.id}")
-        instance.service.setProjectParameter(id.stringId, name, TypedString(value))
+        instance.service.setProjectParameter(id.stringId, name, reqBodyText(value)).await()
     }
 }
 
@@ -269,31 +279,31 @@ private class BuildConfigurationImpl(private val bean: BuildTypeBean,
     override val paused: Boolean
         get() = bean.paused
 
-    override fun fetchBuildTags(): List<String> = instance.service.buildTypeTags(id.stringId).tag!!.map { it.name!! }
+    override suspend fun fetchBuildTags(): List<String> = instance.service.buildTypeTags(id.stringId).await().tag!!.map { it.name!! }
 
-    override fun fetchFinishBuildTriggers(): List<FinishBuildTrigger> =
-            instance.service.buildTypeTriggers(id.stringId)
+    override suspend fun fetchFinishBuildTriggers(): List<FinishBuildTrigger> =
+            instance.service.buildTypeTriggers(id.stringId).await()
                     .trigger
                     ?.filter { it.type == "buildDependencyTrigger" }
                     ?.map { FinishBuildTriggerImpl(it) }.orEmpty()
 
-    override fun fetchArtifactDependencies(): List<ArtifactDependency> =
+    override suspend fun fetchArtifactDependencies(): List<ArtifactDependency> =
             instance.service
-                    .buildTypeArtifactDependencies(id.stringId)
+                    .buildTypeArtifactDependencies(id.stringId).await()
                     .`artifact-dependency`
                     ?.filter { it.disabled == false }
                     ?.map { ArtifactDependencyImpl(it, instance) }.orEmpty()
 
-    override fun setParameter(name: String, value: String) {
+    override suspend fun setParameter(name: String, value: String) {
         LOG.info("Setting parameter $name=$value in ${bean.id}")
-        instance.service.setBuildTypeParameter(id.stringId, name, TypedString(value))
+        instance.service.setBuildTypeParameter(id.stringId, name, reqBodyText(value)).await()
     }
 }
 
 private class VcsRootLocatorImpl(private val service: TeamCityService) : VcsRootLocator {
 
-    override fun list(): List<VcsRoot> {
-        return service.vcsRoots().vcsRoot.map(::VcsRootImpl)
+    override suspend fun list(): List<VcsRoot> {
+        return service.vcsRoots().await().vcsRoot.map(::VcsRootImpl)
     }
 }
 
@@ -369,10 +379,10 @@ private class FinishBuildTriggerImpl(private val bean: TriggerBean) : FinishBuil
 
     private val branchPatterns: List<String>
         get() = bean.properties
-                    ?.property
-                    ?.find { it.name == "branchFilter" }
-                    ?.value
-                    ?.split(" ").orEmpty()
+                ?.property
+                ?.find { it.name == "branchFilter" }
+                ?.value
+                ?.split(" ").orEmpty()
 
     override val includedBranchPatterns: Set<String>
         get() = branchPatterns.filter { !it.startsWith("-:") }.mapTo(HashSet()) { it.substringAfter(":") }
@@ -452,7 +462,13 @@ private class BuildImpl(private val bean: BuildBean,
         get() = BranchImpl(bean.branchName, bean.isDefaultBranch ?: (bean.branchName == null))
 
     val fullBuildBean: BuildBean by lazy {
-        if (isFullBuildBean) bean else instance.service.build(id.stringId)
+        if (isFullBuildBean) {
+            bean
+        } else {
+            runBlocking {
+                instance.service.build(id.stringId).await()
+            }
+        }
     }
 
     override fun toString(): String {
@@ -470,33 +486,33 @@ private class BuildImpl(private val bean: BuildBean,
 
     override fun fetchRevisions(): List<Revision> = fullBuildBean.revisions!!.revision!!.map { RevisionImpl(it) }
 
-    override fun fetchChanges(): List<Change> = instance.service.changes(
+    override suspend fun fetchChanges(): List<Change> = instance.service.changes(
             "build:${id.stringId}",
             "change(id,version,username,user,date,comment)")
-            .change!!.map { ChangeImpl(it, instance) }
+            .await().change!!.map { ChangeImpl(it, instance) }
 
-    override fun addTag(tag: String) {
+    override suspend fun addTag(tag: String) {
         LOG.info("Adding tag $tag to build $buildNumber (id:${id.stringId})")
-        instance.service.addTag(id.stringId, TypedString(tag))
+        instance.service.addTag(id.stringId, reqBodyText(tag)).await()
     }
 
-    override fun pin(comment: String) {
+    override suspend fun pin(comment: String) {
         LOG.info("Pinning build $buildNumber (id:${id.stringId})")
-        instance.service.pin(id.stringId, TypedString(comment))
+        instance.service.pin(id.stringId, reqBodyText(comment)).await()
     }
 
-    override fun unpin(comment: String) {
+    override suspend fun unpin(comment: String) {
         LOG.info("Unpinning build $buildNumber (id:${id.stringId})")
-        instance.service.unpin(id.stringId, TypedString(comment))
+        instance.service.unpin(id.stringId, reqBodyText(comment)).await()
     }
 
-    override fun getArtifacts(parentPath: String): List<BuildArtifactImpl> {
-        return instance.service.artifactChildren(id.stringId, parentPath).file.filter { it.name != null && it.modificationTime != null }.map {
+    override suspend fun getArtifacts(parentPath: String): List<BuildArtifactImpl> {
+        return instance.service.artifactChildren(id.stringId, parentPath).await().file.filter { it.name != null && it.modificationTime != null }.map {
             BuildArtifactImpl(this, it.name!!, it.size, teamCityServiceDateFormat.get().parse(it.modificationTime!!))
         }
     }
 
-    override fun findArtifact(pattern: String, parentPath: String): BuildArtifact {
+    override suspend fun findArtifact(pattern: String, parentPath: String): BuildArtifact {
         val list = getArtifacts(parentPath)
         val regexp = convertToJavaRegexp(pattern)
         val result = list.filter { regexp.matches(it.fileName) }
@@ -511,7 +527,7 @@ private class BuildImpl(private val bean: BuildBean,
         return result.first()
     }
 
-    override fun downloadArtifacts(pattern: String, outputDir: File) {
+    override suspend fun downloadArtifacts(pattern: String, outputDir: File) {
         val list = getArtifacts()
         val regexp = convertToJavaRegexp(pattern)
         val matched = list.filter { regexp.matches(it.fileName) }
@@ -525,16 +541,16 @@ private class BuildImpl(private val bean: BuildBean,
         }
     }
 
-    override fun downloadArtifact(artifactPath: String, output: File) {
+    override suspend fun downloadArtifact(artifactPath: String, output: File) {
         LOG.info("Downloading artifact '$artifactPath' from build $buildNumber (id:${id.stringId}) to $output")
 
         output.parentFile.mkdirs()
-        val response = instance.service.artifactContent(id.stringId, artifactPath)
-        val input = response.body.`in`()
+        val response = instance.service.artifactContent(id.stringId, artifactPath).await()
+        val input = response.byteStream()
         BufferedOutputStream(FileOutputStream(output)).use {
             input.copyTo(it)
         }
-
+        response.close()
         LOG.debug("Artifact '$artifactPath' from build $buildNumber (id:${id.stringId}) downloaded to $output")
     }
 }
@@ -579,7 +595,7 @@ private class VcsRootImpl(private val bean: VcsRootBean) : VcsRoot {
 }
 
 private class BuildArtifactImpl(private val build: Build, override val fileName: String, override val size: Long?, override val modificationTime: Date) : BuildArtifact {
-    override fun download(output: File) {
+    override suspend fun download(output: File) {
         build.downloadArtifact(fileName, output)
     }
 }
@@ -613,4 +629,12 @@ private fun getUserUrlPage(serverUrl: String,
 
     return "${serverUrl.trimEnd('/')}/$pageName" +
             if (params.isNotEmpty()) "?${params.joinToString("&")}" else ""
+}
+
+private fun reqBody(media: String, value: String): RequestBody {
+    return RequestBody.create(MediaType.parse(media), value)
+}
+
+private fun reqBodyText(value: String): RequestBody {
+    return reqBody("text/plain", value)
 }

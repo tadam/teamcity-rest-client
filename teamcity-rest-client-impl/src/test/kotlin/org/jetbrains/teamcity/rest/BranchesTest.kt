@@ -1,5 +1,6 @@
 package org.jetbrains.teamcity.rest
 
+import kotlinx.coroutines.experimental.runBlocking
 import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
@@ -9,7 +10,7 @@ class BranchesTest {
   fun setupLog4j() { setupLog4jDebug() }
 
   @Test
-  fun test_list_works_no_branches() {
+  fun test_list_works_no_branches() = runBlocking<Unit> {
     kotlinBuildsNoBranches()
             .withAllBranches()
             .withStatus(BuildStatus.SUCCESS)
@@ -20,7 +21,7 @@ class BranchesTest {
   }
 
   @Test
-  fun test_list_works() {
+  fun test_list_works() = runBlocking<Unit> {
     kotlinBuilds()
             .withAllBranches()
             .withStatus(BuildStatus.SUCCESS)
@@ -34,7 +35,7 @@ class BranchesTest {
   }
 
   @Test
-  fun test_kotlin_branches() {
+  fun test_kotlin_branches() = runBlocking<Unit> {
     val branches = mutableSetOf<String>()
     kotlinBuilds()
             .withAllBranches()
@@ -49,7 +50,7 @@ class BranchesTest {
   }
 
   @Test
-  fun test_kotlin_default() {
+  fun test_kotlin_default() = runBlocking<Unit> {
     val branches = mutableSetOf<String>()
     kotlinBuilds()
             .withStatus(BuildStatus.SUCCESS)

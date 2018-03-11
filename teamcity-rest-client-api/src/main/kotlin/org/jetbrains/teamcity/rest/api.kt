@@ -7,15 +7,15 @@ abstract class TeamCityInstance {
     abstract fun withLogResponses(): TeamCityInstance
 
     abstract fun builds(): BuildLocator
-    abstract fun queuedBuilds(projectId: ProjectId? = null): List<QueuedBuild>
+    abstract suspend fun queuedBuilds(projectId: ProjectId? = null): List<QueuedBuild>
 
-    abstract fun build(id: BuildId): Build
-    abstract fun build(buildType: BuildConfigurationId, number: String): Build?
-    abstract fun buildConfiguration(id: BuildConfigurationId): BuildConfiguration
+    abstract suspend fun build(id: BuildId): Build
+    abstract suspend fun build(buildType: BuildConfigurationId, number: String): Build?
+    abstract suspend fun buildConfiguration(id: BuildConfigurationId): BuildConfiguration
     abstract fun vcsRoots(): VcsRootLocator
-    abstract fun vcsRoot(id: VcsRootId): VcsRoot
-    abstract fun project(id: ProjectId): Project
-    abstract fun rootProject(): Project
+    abstract suspend fun vcsRoot(id: VcsRootId): VcsRoot
+    abstract suspend fun project(id: ProjectId): Project
+    abstract suspend fun rootProject(): Project
 
     abstract fun getWebUrl(projectId: ProjectId, branch: String? = null): String
     abstract fun getWebUrl(buildConfigurationId: BuildConfigurationId, branch: String? = null): String
@@ -44,7 +44,7 @@ abstract class TeamCityInstance {
 }
 
 interface VcsRootLocator {
-    fun list(): List<VcsRoot>
+    suspend fun list(): List<VcsRoot>
 }
 
 interface BuildLocator {
@@ -71,8 +71,8 @@ interface BuildLocator {
     
     fun sinceDate(date: Date) : BuildLocator
 
-    fun latest(): Build?
-    fun list(): List<Build>
+    suspend fun latest(): Build?
+    suspend fun list(): List<Build>
 }
 
 data class ProjectId(val stringId: String)
@@ -102,7 +102,7 @@ interface Project {
     fun fetchBuildConfigurations(): List<BuildConfiguration>
     fun fetchParameters(): List<Parameter>
 
-    fun setParameter(name: String, value: String)
+    suspend fun setParameter(name: String, value: String)
 }
 
 interface BuildConfiguration {
@@ -116,13 +116,13 @@ interface BuildConfiguration {
      */
     fun getWebUrl(branch: String? = null): String
 
-    fun fetchBuildTags(): List<String>
+    suspend fun fetchBuildTags(): List<String>
 
-    fun fetchFinishBuildTriggers(): List<FinishBuildTrigger>
+    suspend fun fetchFinishBuildTriggers(): List<FinishBuildTrigger>
 
-    fun fetchArtifactDependencies(): List<ArtifactDependency>
+    suspend fun fetchArtifactDependencies(): List<ArtifactDependency>
 
-    fun setParameter(name: String, value: String)
+    suspend fun setParameter(name: String, value: String)
 }
 
 interface Parameter {
@@ -157,19 +157,19 @@ interface Build {
 
     fun fetchRevisions(): List<Revision>
 
-    fun fetchChanges(): List<Change>
+    suspend fun fetchChanges(): List<Change>
 
     fun fetchPinInfo(): PinInfo?
 
     fun fetchTriggeredInfo(): TriggeredInfo?
 
-    fun addTag(tag: String)
-    fun pin(comment: String = "pinned via REST API")
-    fun unpin(comment: String = "unpinned via REST API")
-    fun getArtifacts(parentPath: String = ""): List<BuildArtifact>
-    fun findArtifact(pattern: String, parentPath: String = ""): BuildArtifact
-    fun downloadArtifacts(pattern: String, outputDir: File)
-    fun downloadArtifact(artifactPath: String, output: File)
+    suspend fun addTag(tag: String)
+    suspend fun pin(comment: String = "pinned via REST API")
+    suspend fun unpin(comment: String = "unpinned via REST API")
+    suspend fun getArtifacts(parentPath: String = ""): List<BuildArtifact>
+    suspend fun findArtifact(pattern: String, parentPath: String = ""): BuildArtifact
+    suspend fun downloadArtifacts(pattern: String, outputDir: File)
+    suspend fun downloadArtifact(artifactPath: String, output: File)
 }
 
 interface QueuedBuild {
@@ -211,7 +211,7 @@ interface BuildArtifact {
     val size: Long?
     val modificationTime: Date
 
-    fun download(output: File)
+    suspend fun download(output: File)
 }
 
 interface VcsRoot {

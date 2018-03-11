@@ -5,6 +5,8 @@ import org.junit.Before
 import org.junit.Test
 import java.util.*
 import kotlin.test.assertEquals
+import kotlinx.coroutines.experimental.runBlocking
+
 
 class BuildTest {
     @Before
@@ -13,7 +15,7 @@ class BuildTest {
     }
 
     @Test
-    fun test_to_string() {
+    fun test_to_string() = runBlocking<Unit> {
         val builds = publicInstance().builds()
                 .fromConfiguration(compileExamplesConfiguration)
                 .limitResults(3)
@@ -23,7 +25,7 @@ class BuildTest {
     }
     
     @Test
-    fun since_date() {
+    fun since_date() = runBlocking<Unit> {
         val monthAgo = GregorianCalendar()
         monthAgo.add(Calendar.MONTH, -1)
         
@@ -39,7 +41,7 @@ class BuildTest {
     }
 
     @Test
-    fun test_build_fetch_revisions() {
+    fun test_build_fetch_revisions() = runBlocking<Unit> {
         publicInstance().builds()
                 .fromConfiguration(compileExamplesConfiguration)
                 .limitResults(10)
@@ -51,7 +53,7 @@ class BuildTest {
     }
 
     @Test
-    fun test_fetch_status() {
+    fun test_fetch_status() = runBlocking<Unit> {
         val build = publicInstance().builds()
                 .fromConfiguration(compileExamplesConfiguration)
                 .limitResults(1)
@@ -61,7 +63,7 @@ class BuildTest {
     }
 
     @Test
-    fun test_get_artifacts() {
+    fun test_get_artifacts() = runBlocking<Unit> {
         val build = publicInstance().builds()
                 .fromConfiguration(kotlinDevCompilerAllPlugins)
                 .limitResults(1)
@@ -72,7 +74,7 @@ class BuildTest {
     }
 
     @Test
-    fun test_get_webUrl() {
+    fun test_get_webUrl() = runBlocking<Unit> {
         val build = publicInstance().builds()
                 .fromConfiguration(compilerAndPluginConfiguration)
                 .limitResults(1)

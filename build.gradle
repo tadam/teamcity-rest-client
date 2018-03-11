@@ -1,5 +1,7 @@
 buildscript {
-    ext.kotlin_version = '1.1.4-3'
+    ext.kotlin_version = '1.2.30'
+    ext.retrofit_version = '2.3.0'
+    ext.okhttp3_version = '3.10.0'
 
     repositories {
         mavenCentral()
@@ -19,6 +21,12 @@ allprojects {
     repositories {
         mavenCentral()
     }
+
+    kotlin {
+        experimental {
+            coroutines 'enable'
+        }
+    }
 }
 
 configure(project(':teamcity-rest-client-api')) {
@@ -30,9 +38,11 @@ configure(project(':teamcity-rest-client-api')) {
 configure(project(':teamcity-rest-client-impl')) {
     dependencies {
         compile "commons-codec:commons-codec:1.10"
-        compile 'com.squareup.retrofit:retrofit:1.9.0'
-        compile 'com.squareup.okhttp3:okhttp:3.0.0'
-        compile 'com.jakewharton.retrofit:retrofit1-okhttp3-client:1.0.2'
+        compile "com.squareup.retrofit2:retrofit:$retrofit_version"
+        compile "com.squareup.retrofit2:converter-gson:$retrofit_version"
+        compile "com.squareup.okhttp3:okhttp:$okhttp3_version"
+        compile "com.squareup.okhttp3:logging-interceptor:$okhttp3_version"
+        compile "ru.gildor.coroutines:kotlin-coroutines-retrofit:0.9.0"
         compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 
         compile 'org.slf4j:slf4j-api:1.7.12'
