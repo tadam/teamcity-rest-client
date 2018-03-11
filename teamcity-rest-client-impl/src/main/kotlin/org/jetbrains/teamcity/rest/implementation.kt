@@ -75,7 +75,7 @@ internal class TeamCityInstanceImpl(internal val serverUrl: String,
 
     internal val service = Retrofit.Builder()
             .client(client)
-            .baseUrl("$serverUrl/$authMethod/")
+            .baseUrl("${serverUrl.trimEnd('/')}/$authMethod/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(TeamCityService::class.java)
